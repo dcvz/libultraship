@@ -27,7 +27,7 @@ class Window {
     ~Window();
     void WriteSaveFile(const std::filesystem::path& savePath, uintptr_t addr, void* dramAddr, size_t size);
     void ReadSaveFile(std::filesystem::path savePath, uintptr_t addr, void* dramAddr, size_t size);
-    void CreateDefaults();
+    void SetConfigDefaultValues(int isFullscreen, int fullscreenWidth, int fullscreenHeight);
     void MainLoop(void (*MainFunction)(void));
     void Initialize(const std::vector<std::string>& otrFiles = {},
                     const std::unordered_set<uint32_t>& validHashes = {});
@@ -71,6 +71,8 @@ class Window {
     void InitializeResourceManager(const std::vector<std::string>& otrFiles = {},
                                    const std::unordered_set<uint32_t>& validHashes = {});
     void InitializeWindowManager();
+
+    void CreateDefaults();
 
     std::shared_ptr<spdlog::logger> mLogger;
     std::shared_ptr<Mercury>

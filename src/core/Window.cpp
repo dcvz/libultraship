@@ -40,6 +40,13 @@
 #include "port/wiiu/WiiUImpl.h"
 #endif
 
+// Default Values. Use SetDefaultValues() to change them.
+// - These are only used on fresh installs.
+static bool defaultIsFullscreen = false;
+static int defaultFullscreenWidth = 1920;
+static int defaultFullscreenHeight = 1080;
+
+
 #define LOAD_TEX(texPath) \
     static_cast<Ship::Texture*>(Ship::Window::GetInstance()->GetResourceManager()->LoadResource(texPath).get());
 
@@ -266,6 +273,12 @@ Window::~Window() {
     SPDLOG_DEBUG("destruct window");
 }
 
+void Window::SetConfigDefaultValues(int isFullscreen, int fullscreenWidth, int fullscreenHeight) {
+    defaultIsFullscreen = isFullscreen;
+    defaultFullscreenWidth = fullscreenWidth;
+    defaultFullscreenHeight = fullscreenHeight;
+}
+
 void Window::CreateDefaults() {
     if (GetConfig()->isNewInstance) {
         GetConfig()->setInt("Window.Width", 640);
@@ -274,9 +287,9 @@ void Window::CreateDefaults() {
         GetConfig()->setString("Window.GfxBackend", "");
         GetConfig()->setString("Window.AudioBackend", "");
 
-        GetConfig()->setBool("Window.Fullscreen.Enabled", false);
-        GetConfig()->setInt("Window.Fullscreen.Width", 1920);
-        GetConfig()->setInt("Window.Fullscreen.Height", 1080);
+        GetConfig()->setBool("Window.Fullscreen.Enabled", defaultIsFullscreen);
+        GetConfig()->setInt("Window.Fullscreen.Width", defaultFullscreenWidth);
+        GetConfig()->setInt("Window.Fullscreen.Height", defaultFullscreenHeight);
 
         GetConfig()->setString("Game.SaveName", "");
         GetConfig()->setString("Game.Main Archive", "");
