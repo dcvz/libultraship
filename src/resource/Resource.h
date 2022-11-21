@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "Archive.h"
 #include "binarytools/BinaryReader.h"
 #include "binarytools/BinaryWriter.h"
 #include "OtrFile.h"
