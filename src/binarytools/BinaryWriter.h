@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "endianness.h"
+#include <libultraship/endianness.h>
 #include "Stream.h"
 
 namespace Ship {

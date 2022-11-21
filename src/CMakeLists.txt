@@ -38,7 +38,6 @@ set(Source_Files__BinaryTools
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/BinaryReader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/BinaryWriter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/BinaryWriter.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/endianness.h
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/MemoryStream.h
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/MemoryStream.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/binarytools/Stream.h

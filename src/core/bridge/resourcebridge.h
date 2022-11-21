@@ -8,6 +8,24 @@
 #ifdef __cplusplus
 #include "resource/Resource.h"
 
+#include "resource/GameVersions.h" // TODO: This should go away with SoH related resources
+#include "resource/types/Animation.h"
+#include "resource/types/Array.h"
+#include "resource/types/Audio.h"
+#include "resource/types/Blob.h"
+#include "resource/types/Cutscene.h"
+#include "resource/types/DisplayList.h"
+#include "resource/types/Material.h"
+#include "resource/types/Matrix.h"
+#include "resource/types/Model.h"
+#include "resource/types/Path.h"
+#include "resource/types/PlayerAnimation.h"
+#include "resource/types/Scene.h"
+#include "resource/types/Skeleton.h"
+#include "resource/types/Text.h"
+#include "resource/types/Texture.h"
+#include "resource/types/Vertex.h"
+
 std::shared_ptr<Ship::Resource> LoadResource(const char* name);
 std::shared_ptr<Ship::Resource> LoadResource(uint64_t crc);
 

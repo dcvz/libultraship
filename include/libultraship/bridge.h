@@ -6,4 +6,7 @@
 #include "core/bridge/controldeckbridge.h"
 #include "core/bridge/windowbridge.h"
 
+// TODO: Make proper bridges for these
+#include "debug/CrashHandler.h"
+
 #endif

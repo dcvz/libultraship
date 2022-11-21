@@ -4,6 +4,8 @@
 #include "libultra.h"
 #include "bridge.h"
 #include "color.h"
-#include "misc/Cvar.h"
+#include "endianness.h"
+#include "cvar.h"
+#include "logger.h"
 
 #endif

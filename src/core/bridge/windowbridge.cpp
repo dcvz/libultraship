@@ -1,5 +1,8 @@
 #include "windowbridge.h"
 #include "core/Window.h"
+#include "menu/ImGuiImpl.h"
+
+#include <vector>
 
 extern "C" {
 
