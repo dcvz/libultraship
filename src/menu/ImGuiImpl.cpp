@@ -45,10 +45,14 @@
 #include "port/switch/SwitchImpl.h"
 #endif
 
+#ifdef ENABLE_VULKAN
+#include <ImGui/backends/imgui_impl_vulkan.h>
+#include <ImGui/backends/imgui_impl_sdl.h>
+#endif
+
 #ifdef ENABLE_OPENGL
 #include <ImGui/backends/imgui_impl_opengl3.h>
 #include <ImGui/backends/imgui_impl_sdl.h>
-
 #endif
 
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -107,6 +111,9 @@ std::vector<std::pair<const char*, const char*>> renderingBackends = {
 #ifdef _WIN32
     { "dx11", "DirectX" },
 #endif
+#if defined(ENABLE_VULKAN)
+        { "sdl", "Vulkan" },
+#endif
 #ifndef __WIIU__
     { "sdl", "OpenGL" }
 #else
@@ -149,14 +156,29 @@ void InitSettings() {
 
 void PopulateBackendIds(std::shared_ptr<Mercury> cfg) {
     std::string renderingBackend = cfg->getString("Window.GfxBackend");
-    if (renderingBackend.empty()) {
+    std::string gfxApi = cfg->getString("Window.GfxApi");
+
+    int matchType = 2; // 0 = backend, 1 = gfxApi, 2 = both
+
+    if (renderingBackend.empty() && gfxApi.empty()) {
         lastRenderingBackendID = 0;
-    } else {
-        for (size_t i = 0; i < renderingBackends.size(); i++) {
-            if (renderingBackend == renderingBackends[i].first) {
-                lastRenderingBackendID = i;
-                break;
-            }
+    } else if (gfxApi.empty()) { // only backend is set
+        matchType = 0;
+    } else if (renderingBackend.empty()) { // only gfxApi is set
+        matchType = 1;
+    }
+
+    for (size_t i = 0; i < renderingBackends.size(); i++) {
+        if (matchType == 0 && renderingBackend == renderingBackends[i].first) {
+            lastRenderingBackendID = i;
+        }
+
+        if (matchType == 1 && gfxApi == renderingBackends[i].second) {
+            lastRenderingBackendID = i;
+        }
+
+        if (matchType == 2 && renderingBackend == renderingBackends[i].first && gfxApi == renderingBackends[i].second) {
+            lastRenderingBackendID = i;
         }
     }
 
@@ -165,7 +187,7 @@ void PopulateBackendIds(std::shared_ptr<Mercury> cfg) {
         lastAudioBackendID = 0;
     } else {
         for (size_t i = 0; i < audioBackends.size(); i++) {
-            if (audioBackend == audioBackends[i].first) {
+            if(audioBackend == audioBackends[i].first) {
                 lastAudioBackendID = i;
                 break;
             }

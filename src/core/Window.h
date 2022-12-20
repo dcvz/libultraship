@@ -80,6 +80,7 @@ class Window {
     std::shared_ptr<ControlDeck> mControlDeck;
 
     std::string mGfxBackend;
+    std::string mGfxApi;
     std::string mAudioBackend;
     GfxRenderingAPI* mRenderingApi;
     GfxWindowManagerAPI* mWindowManagerApi;

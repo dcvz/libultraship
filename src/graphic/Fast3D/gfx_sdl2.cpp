@@ -29,6 +29,7 @@
 #ifdef ENABLE_VULKAN
 #include <SDL2/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
+#include "VkBootstrap.h"
 #include "gfx_vulkan.h"
 #endif
 
@@ -45,7 +46,10 @@
 #define GFX_BACKEND_NAME "SDL"
 
 static SDL_Window* wnd;
-static SDL_GLContext ctx;
+static SDL_GLContext gl_context;
+#ifdef ENABLE_VULKAN
+static vkb::Instance vkb_instance;
+#endif
 static int inverted_scancode_table[512];
 static int vsync_enabled = 0;
 static int window_width = DESIRED_SCREEN_WIDTH;
@@ -258,7 +262,7 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
 
     bool use_opengl = true;
     #if defined(ENABLE_VULKAN)
-    use_opengl = strcmp(gfx_api_name, "OpenGL") == 0;
+    use_opengl = strcmp(gfx_api_name, "OpenDGL") == 0;
     #endif
 
     if (use_opengl) {
@@ -309,7 +313,7 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
         }
     #endif
 
-        ctx = SDL_GL_CreateContext(wnd);
+        gl_context = SDL_GL_CreateContext(wnd);
 
     #ifdef __SWITCH__
         if (!gladLoadGLLoader(SDL_GL_GetProcAddress)) {
@@ -317,20 +321,44 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
         }
     #endif
 
-        SDL_GL_MakeCurrent(wnd, ctx);
+        SDL_GL_MakeCurrent(wnd, gl_context);
         SDL_GL_SetSwapInterval(1);
     } else {
         uint32_t extensions_count = 0;
         SDL_Vulkan_GetInstanceExtensions(wnd, &extensions_count, NULL);
         const char** extensions = new const char*[extensions_count];
         SDL_Vulkan_GetInstanceExtensions(wnd, &extensions_count, extensions);
-        // SetupVulkan(extensions, extensions_count);
+        
+        vkb::InstanceBuilder instance_builder;
+        instance_builder.set_app_name(game_name);
+        instance_builder.request_validation_layers(true);
+        instance_builder.use_default_debug_messenger();
+
+        for (uint32_t i = 0; i < extensions_count; i++) {
+            instance_builder.enable_extension(extensions[i]);
+        }
+
+        auto inst_ret = instance_builder.build();
+        if (!inst_ret) {
+            printf("Failed to create Vulkan instance: %s\n", inst_ret.error().message().c_str());
+            exit(1);
+        }
+
         delete[] extensions;
+        vkb_instance = inst_ret.value();
     }
 
     SohImGui::WindowImpl window_impl;
     window_impl.backend = SohImGui::Backend::SDL;
-    window_impl.sdl = { wnd, ctx };
+
+    if (use_opengl) {
+        window_impl.sdl = { wnd, gl_context };
+    } else {
+        #if defined(ENABLE_VULKAN) // redundant, but makes the compiler happy
+        window_impl.sdl = { wnd, vkb_instance };
+        #endif
+    }
+
     SohImGui::Init(window_impl);
 
     for (size_t i = 0; i < sizeof(windows_scancode_table) / sizeof(SDL_Scancode); i++) {

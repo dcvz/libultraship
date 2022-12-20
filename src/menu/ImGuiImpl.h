@@ -19,6 +19,11 @@ enum class Backend {
     GX2,
 };
 
+enum class SDLGfxApi {
+    Vulkan,
+    OpenGL
+};
+
 enum class Dialogues {
     dConsole,
     dMenubar,
@@ -36,6 +41,7 @@ typedef struct {
         struct {
             void* window;
             void* context;
+            SDLGfxApi gfx_api;
         } sdl;
         struct {
             uint32_t width;
