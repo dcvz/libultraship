@@ -123,3 +123,16 @@ add_library(StrHash64 STATIC)
 target_sources(StrHash64 PRIVATE ${STRHASH64_DIR}/StrHash64.cpp)
 
 target_include_directories(StrHash64 PUBLIC ${STRHASH64_DIR})
+
+#=================== vk-bootstrap ===================
+
+find_package(Vulkan)
+if (Vulkan_FOUND)
+    set(VK_BOOTSTRAP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
+    add_library(vk-bootstrap STATIC)
+
+    target_sources(vk-bootstrap PRIVATE ${VK_BOOTSTRAP_DIR}/VkBootstrap.cpp)
+    target_link_libraries(vk-bootstrap PUBLIC Vulkan::Vulkan)
+
+    target_include_directories(vk-bootstrap PUBLIC ${VK_BOOTSTRAP_DIR})
+endif()

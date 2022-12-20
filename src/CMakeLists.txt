@@ -365,16 +365,18 @@ endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     find_Library(OSX_FOUNDATION Foundation)
-    target_link_libraries(libultraship PRIVATE ${OSX_FOUNDATION} ${CMAKE_DL_LIBS})
+    target_link_libraries(libultraship PRIVATE ${OSX_FOUNDATION} ${CMAKE_DL_LIBS} vk-bootstrap)
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(X11)
     find_package(PulseAudio)
-    target_link_libraries(libultraship PRIVATE ${X11_LIBRARIES} ${PULSEAUDIO_LIBRARY})
+    target_link_libraries(libultraship PRIVATE ${X11_LIBRARIES} ${PULSEAUDIO_LIBRARY} vk-bootstrap)
 endif()
 
 #=================== Compile Options & Defs ===================
+
+find_package(Vulkan)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -391,6 +393,7 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
         $<$<CONFIG:Debug>:_DEBUG>
         $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         SPDLOG_ACTIVE_LEVEL=0
+        $<$<BOOL:${Vulkan_FOUND}>:ENABLE_VULKAN>
     )
 else ()
     target_compile_definitions(libultraship PRIVATE

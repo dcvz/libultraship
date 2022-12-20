@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#if defined(ENABLE_OPENGL)
+#if defined(ENABLE_OPENGL) || defined(ENABLE_VULKAN)
 
 #ifdef __MINGW32__
 #define FOR_WINDOWS 1
@@ -24,6 +24,12 @@
 #include <SDL2/SDL.h>
 #define GL_GLEXT_PROTOTYPES 1
 #include <SDL2/SDL_opengles2.h>
+#endif
+
+#ifdef ENABLE_VULKAN
+#include <SDL2/SDL_vulkan.h>
+#include <vulkan/vulkan.h>
+#include "gfx_vulkan.h"
 #endif
 
 #include "menu/ImGuiImpl.h"
@@ -250,8 +256,15 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
 
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    bool use_opengl = true;
+    #if defined(ENABLE_VULKAN)
+    use_opengl = strcmp(gfx_api_name, "OpenGL") == 0;
+    #endif
+
+    if (use_opengl) {
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    }
 
 #if defined(__APPLE__)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
@@ -278,27 +291,42 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
     height = window_height;
 #endif
 
-    wnd = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
-                           SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-
-#ifndef __SWITCH__
-    SDL_GL_GetDrawableSize(wnd, &window_width, &window_height);
-
-    if (start_in_fullscreen) {
-        set_fullscreen(true, false);
+    Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (use_opengl) {
+        flags = flags | SDL_WINDOW_OPENGL;
+    } else {
+        flags = flags | SDL_WINDOW_VULKAN;
     }
-#endif
 
-    ctx = SDL_GL_CreateContext(wnd);
+    wnd = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
 
-#ifdef __SWITCH__
-    if (!gladLoadGLLoader(SDL_GL_GetProcAddress)) {
-        printf("Failed to initialize glad\n");
+    if (use_opengl) {
+    #ifndef __SWITCH__
+        SDL_GL_GetDrawableSize(wnd, &window_width, &window_height);
+
+        if (start_in_fullscreen) {
+            set_fullscreen(true, false);
+        }
+    #endif
+
+        ctx = SDL_GL_CreateContext(wnd);
+
+    #ifdef __SWITCH__
+        if (!gladLoadGLLoader(SDL_GL_GetProcAddress)) {
+            printf("Failed to initialize glad\n");
+        }
+    #endif
+
+        SDL_GL_MakeCurrent(wnd, ctx);
+        SDL_GL_SetSwapInterval(1);
+    } else {
+        uint32_t extensions_count = 0;
+        SDL_Vulkan_GetInstanceExtensions(wnd, &extensions_count, NULL);
+        const char** extensions = new const char*[extensions_count];
+        SDL_Vulkan_GetInstanceExtensions(wnd, &extensions_count, extensions);
+        // SetupVulkan(extensions, extensions_count);
+        delete[] extensions;
     }
-#endif
-
-    SDL_GL_MakeCurrent(wnd, ctx);
-    SDL_GL_SetSwapInterval(1);
 
     SohImGui::WindowImpl window_impl;
     window_impl.backend = SohImGui::Backend::SDL;
