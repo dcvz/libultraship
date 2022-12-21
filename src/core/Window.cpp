@@ -507,12 +507,12 @@ void Window::InitializeWindowManager() {
         mWindowManagerApi = &gfx_dxgi_api;
     }
 #endif
-#if defined(ENABLE_OPENGL) || defined(ENABLE_METAL)
+#if defined(ENABLE_OPENGL) || defined(ENABLE_VULKAN)
     if (mGfxBackend == "sdl") {
         if (mGfxApi == "OpenGL") {
             mRenderingApi = &gfx_opengl_api;
         }
-    #if defined(ENABLE_METAL)
+    #if defined(ENABLE_VULKAN)
         else if (mGfxApi == "Vulkan") {
             mRenderingApi = &gfx_vulkan_api;
         }

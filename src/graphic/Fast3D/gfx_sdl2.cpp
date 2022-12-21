@@ -352,12 +352,13 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
     window_impl.backend = SohImGui::Backend::SDL;
 
     if (use_opengl) {
-        window_impl.sdl = { wnd, gl_context };
-    } else {
-        #if defined(ENABLE_VULKAN) // redundant, but makes the compiler happy
-        window_impl.sdl = { wnd, vkb_instance };
-        #endif
+        window_impl.opengl = { wnd, gl_context };
     }
+#if defined(ENABLE_VULKAN)
+    else {
+        window_impl.vulkan = { wnd, vkb_instance };
+    }
+#endif
 
     SohImGui::Init(window_impl);
 

@@ -46,6 +46,7 @@
 #endif
 
 #ifdef ENABLE_VULKAN
+#include "graphic/Fast3D/gfx_vulkan.h"
 #include <ImGui/backends/imgui_impl_vulkan.h>
 #include <ImGui/backends/imgui_impl_sdl.h>
 #endif
@@ -112,7 +113,7 @@ std::vector<std::pair<const char*, const char*>> renderingBackends = {
     { "dx11", "DirectX" },
 #endif
 #if defined(ENABLE_VULKAN)
-        { "sdl", "Vulkan" },
+    { "sdl", "Vulkan" },
 #endif
 #ifndef __WIIU__
     { "sdl", "OpenGL" }
@@ -203,9 +204,11 @@ void ImGuiWMInit() {
             break;
 #else
         case Backend::SDL:
-            SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
-            ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(impl.sdl.window), impl.sdl.context);
-            break;
+            if (impl.vulkan.instance) {
+                ImGui_ImplSDL2_InitForVulkan(static_cast<SDL_Window*>(impl.vulkan.window));
+            } else {
+                ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(impl.opengl.window), impl.opengl.context);
+            }
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
         case Backend::DX11:
@@ -225,12 +228,18 @@ void ImGuiBackendInit() {
             break;
 #else
         case Backend::SDL:
-#if defined(__APPLE__)
-            ImGui_ImplOpenGL3_Init("#version 410 core");
-#else
-            ImGui_ImplOpenGL3_Init("#version 120");
+#if defined(ENABLE_VULKAN)
+            if (impl.vulkan.instance) {
+                Vulkan_Init(impl.vulkan.instance);
+            }
 #endif
-            break;
+            if (impl.opengl.context) {
+#if defined(__APPLE__)
+                ImGui_ImplOpenGL3_Init("#version 410 core");
+#else
+                ImGui_ImplOpenGL3_Init("#version 120");
+#endif
+            }
 #endif
 
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -273,7 +282,7 @@ void ImGuiWMNewFrame() {
             break;
 #else
         case Backend::SDL:
-            ImGui_ImplSDL2_NewFrame(static_cast<SDL_Window*>(impl.sdl.window));
+            ImGui_ImplSDL2_NewFrame();
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -295,7 +304,11 @@ void ImGuiBackendNewFrame() {
             break;
 #else
         case Backend::SDL:
-            ImGui_ImplOpenGL3_NewFrame();
+            if (impl.vulkan.instance) {
+                ImGui_ImplVulkan_NewFrame();
+            } else {
+                ImGui_ImplOpenGL3_NewFrame();
+            }
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -321,7 +334,11 @@ void ImGuiRenderDrawData(ImDrawData* data) {
             break;
 #else
         case Backend::SDL:
-            ImGui_ImplOpenGL3_RenderDrawData(data);
+            if (impl.vulkan.instance) {
+                Vulkan_RenderDrawData(data);
+            } else {
+                ImGui_ImplOpenGL3_RenderDrawData(data);
+            }
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -339,7 +356,7 @@ bool supportsViewports() {
         case Backend::DX11:
             return true;
         case Backend::SDL:
-            return true;
+            return true; // TODO: Test Vulkan
         default:
             return false;
     }
@@ -812,6 +829,7 @@ std::pair<const char*, const char*> GetCurrentAudioBackend() {
 
 void SetCurrentRenderingBackend(uint8_t index, std::pair<const char*, const char*> backend) {
     Window::GetInstance()->GetConfig()->setString("Window.GfxBackend", backend.first);
+    Window::GetInstance()->GetConfig()->setString("Window.GfxApi", backend.second);
     lastRenderingBackendID = index;
 }
 
@@ -901,6 +919,11 @@ ImTextureID GetTextureByID(int id) {
     if (impl.backend == Backend::DX11) {
         ImTextureID gfx_d3d11_get_texture_by_id(int id);
         return gfx_d3d11_get_texture_by_id(id);
+    }
+#endif
+#ifdef ENABLED_VULKAN
+    if (impl.Backend == Backend::SDL && impl.vulkan.instance) {
+        return gfx_vulkan_get_texture_by_id(id);
     }
 #endif
 #ifdef __WIIU__

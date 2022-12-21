@@ -6,6 +6,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
 endif()
 
+find_package(Vulkan)
+
 #=================== Audio ===================
 
 set(Source_Files__Audio
@@ -322,6 +324,13 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     )
 endif()
 
+if (Vulkan_FOUND)
+    list(APPEND Source_Files__Graphic
+        ${CMAKE_CURRENT_SOURCE_DIR}/graphic/Fast3D/gfx_vulkan.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/graphic/Fast3D/gfx_vulkan.cpp
+    )
+endif()
+
 source_group("Graphic" FILES ${Source_Files__Graphic})
 target_sources(libultraship PRIVATE ${Source_Files__Graphic})
 
@@ -375,8 +384,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 #=================== Compile Options & Defs ===================
-
-find_package(Vulkan)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(${PROJECT_NAME} PRIVATE

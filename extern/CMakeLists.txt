@@ -1,4 +1,5 @@
 find_package(OpenGL QUIET)
+find_package(Vulkan)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
     find_package(SDL2 CONFIG REQUIRED)
@@ -46,6 +47,10 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         ${IMGUI_DIR}/backends/imgui_impl_sdl.cpp
     )
+
+    if (Vulkan_FOUND)
+        target_sources(ImGui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+    endif()
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -55,7 +60,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
     )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
-
     target_sources(ImGui
         PRIVATE
         ${IMGUI_DIR}/backends/wiiu/imgui_impl_wiiu.cpp
@@ -82,6 +86,11 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(GLEW REQUIRED)
     target_link_libraries(ImGui PUBLIC ${OPENGL_glx_LIBRARY} ${OPENGL_opengl_LIBRARY} GLEW::GLEW)
+endif()
+
+if (Vulkan_FOUND)
+    target_sources(ImGui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+    target_link_libraries(ImGui PUBLIC Vulkan::Vulkan)
 endif()
 
 #=================== tinyxml2 ===================
@@ -126,7 +135,6 @@ target_include_directories(StrHash64 PUBLIC ${STRHASH64_DIR})
 
 #=================== vk-bootstrap ===================
 
-find_package(Vulkan)
 if (Vulkan_FOUND)
     set(VK_BOOTSTRAP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vk-bootstrap)
     add_library(vk-bootstrap STATIC)
