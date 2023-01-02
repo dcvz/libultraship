@@ -6,6 +6,12 @@
 #include "menu/Console.h"
 #include "InputEditor.h"
 
+#if __APPLE__
+#include <SDL_video.h>
+#else
+#include <SDL2/SDL_video.h>
+#endif
+
 struct GameAsset {
     uint32_t textureId;
     int width;
@@ -38,8 +44,9 @@ typedef struct {
             void* context;
         } opengl;
         struct {
-            void* window;
+            SDL_Window* window;
             void* instance;
+            void* surface;
         } vulkan;
         struct {
             uint32_t width;

@@ -230,7 +230,7 @@ void ImGuiBackendInit() {
         case Backend::SDL:
 #if defined(ENABLE_VULKAN)
             if (impl.vulkan.instance) {
-                Vulkan_Init(impl.vulkan.instance);
+                Vulkan_Init(impl.vulkan.window, impl.vulkan.instance, impl.vulkan.surface);
             }
 #endif
             if (impl.opengl.context) {

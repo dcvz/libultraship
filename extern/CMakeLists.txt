@@ -89,8 +89,14 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if (Vulkan_FOUND)
+    find_package(glslang REQUIRED)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(THREADS_PREFER_PTHREAD_FLAG ON)
+    endif()
+    find_package(Threads REQUIRED)
+
     target_sources(ImGui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
-    target_link_libraries(ImGui PUBLIC Vulkan::Vulkan)
+    target_link_libraries(ImGui PUBLIC Vulkan::Vulkan glslang::glslang glslang::SPIRV glslang::OGLCompiler)
 endif()
 
 #=================== tinyxml2 ===================

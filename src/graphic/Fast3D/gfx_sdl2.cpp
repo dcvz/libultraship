@@ -49,6 +49,7 @@ static SDL_Window* wnd;
 static SDL_GLContext gl_context;
 #ifdef ENABLE_VULKAN
 static vkb::Instance vkb_instance;
+static VkSurfaceKHR vk_surface;
 #endif
 static int inverted_scancode_table[512];
 static int vsync_enabled = 0;
@@ -303,6 +304,7 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
     }
 
     wnd = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
+    SohImGui::WindowImpl window_impl;
 
     if (use_opengl) {
     #ifndef __SWITCH__
@@ -323,7 +325,11 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
 
         SDL_GL_MakeCurrent(wnd, gl_context);
         SDL_GL_SetSwapInterval(1);
-    } else {
+
+        window_impl.opengl = { wnd, gl_context };
+    }
+#if defined(ENABLE_VULKAN) // redundant but necessary for compile
+    else {
         uint32_t extensions_count = 0;
         SDL_Vulkan_GetInstanceExtensions(wnd, &extensions_count, NULL);
         const char** extensions = new const char*[extensions_count];
@@ -346,20 +352,18 @@ static void gfx_sdl_init(const char* game_name, const char* gfx_api_name, bool s
 
         delete[] extensions;
         vkb_instance = inst_ret.value();
-    }
 
-    SohImGui::WindowImpl window_impl;
-    window_impl.backend = SohImGui::Backend::SDL;
+        VkResult err;
+        if (SDL_Vulkan_CreateSurface(wnd, vkb_instance.instance, &vk_surface) == 0) {
+            printf("Failed to create Vulkan surface.\n");
+            exit(1);
+        }
 
-    if (use_opengl) {
-        window_impl.opengl = { wnd, gl_context };
-    }
-#if defined(ENABLE_VULKAN)
-    else {
-        window_impl.vulkan = { wnd, vkb_instance };
+        window_impl.vulkan = { wnd, vkb_instance, vk_surface };
     }
 #endif
 
+    window_impl.backend = SohImGui::Backend::SDL;
     SohImGui::Init(window_impl);
 
     for (size_t i = 0; i < sizeof(windows_scancode_table) / sizeof(SDL_Scancode); i++) {
