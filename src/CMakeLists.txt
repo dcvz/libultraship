@@ -357,7 +357,7 @@ target_link_libraries(libultraship
     PUBLIC ImGui Mercury storm
 )
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
+if (CMAKE_SYSTEM_NAME MATCHES "Darwin|NintendoSwitch")
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
     target_link_libraries(libultraship PRIVATE Threads::Threads)
@@ -388,6 +388,7 @@ endif()
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     target_compile_definitions(libultraship PRIVATE
         ENABLE_OPENGL
+        $<$<BOOL:${USE_OPENGLES}>:USE_OPENGLES>
         $<$<CONFIG:Debug>:_DEBUG>
         $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
         SPDLOG_ACTIVE_LEVEL=0

@@ -1,5 +1,3 @@
-find_package(OpenGL QUIET)
-
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
     find_package(SDL2 CONFIG REQUIRED)
 else()
@@ -55,7 +53,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
         ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
     )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
-
     target_sources(ImGui
         PRIVATE
         ${IMGUI_DIR}/backends/wiiu/imgui_impl_wiiu.cpp
@@ -73,15 +70,16 @@ else()
     target_link_libraries(ImGui PUBLIC SDL2::SDL2)
 endif()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if (CMAKE_SYSTEM_NAME MATCHES "Windows|Darwin")
     find_package(GLEW REQUIRED)
-    target_link_libraries(ImGui PUBLIC opengl32 GLEW::GLEW)
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    find_package(GLEW REQUIRED)
-    target_link_libraries(ImGui PUBLIC ${OPENGL_opengl_LIBRARY} GLEW::GLEW)
+    target_link_libraries(ImGui PUBLIC ${OPENGL-LIB} GLEW::GLEW)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(GLEW REQUIRED)
-    target_link_libraries(ImGui PUBLIC ${OPENGL_glx_LIBRARY} ${OPENGL_opengl_LIBRARY} GLEW::GLEW)
+    target_link_libraries(ImGui PUBLIC ${OPENGL_glx_LIBRARY} ${OPENGL-LIB} GLEW::GLEW)
+endif()
+
+if (USE_OPENGLES)
+    target_compile_definitions(ImGui PUBLIC IMGUI_IMPL_OPENGL_ES3)
 endif()
 
 #=================== tinyxml2 ===================

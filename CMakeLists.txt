@@ -11,6 +11,7 @@ endif()
 
 include(cmake/Utils.cmake)
 
+# use vcpkg for dependencies on windows if flag is set
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND USE_AUTO_VCPKG)
     include(cmake/automate-vcpkg.cmake)
 
@@ -21,6 +22,18 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND USE_AUTO_VCPKG)
     vcpkg_install_packages(zlib bzip2 SDL2 GLEW)
 endif()
 
+## Setup GL for subprojects
+if (USE_OPENGLES)
+    find_library(OPENGL-LIB NAMES GLESv2)
+    if (NOT OPENGL-LIB)
+        message(FATAL_ERROR "USE_OPENGLES=1, but libGLESv2 could not be found")
+    endif()
+else()
+    find_package(OpenGL QUIET)
+    set(OPENGL-LIB ${OPENGL_opengl_LIBRARY})
+endif()
+
+# setup subprojects
 add_subdirectory("extern")
 add_subdirectory("src")
 

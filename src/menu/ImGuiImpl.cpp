@@ -203,11 +203,7 @@ void ImGuiBackendInit() {
             break;
 #else
         case Backend::SDL:
-#if defined(__APPLE__)
-            ImGui_ImplOpenGL3_Init("#version 410 core");
-#else
-            ImGui_ImplOpenGL3_Init("#version 120");
-#endif
+            ImGui_ImplOpenGL3_Init();
             break;
 #endif
 
