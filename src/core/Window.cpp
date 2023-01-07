@@ -19,6 +19,7 @@
 #include "graphic/Fast3D/gfx_dxgi.h"
 #include "graphic/Fast3D/gfx_glx.h"
 #include "graphic/Fast3D/gfx_opengl.h"
+#include "graphic/Fast3D/gfx_metal.h"
 #include "graphic/Fast3D/gfx_direct3d11.h"
 #include "graphic/Fast3D/gfx_direct3d12.h"
 #include "graphic/Fast3D/gfx_wiiu.h"
@@ -272,6 +273,7 @@ void Window::CreateDefaults() {
         GetConfig()->setInt("Window.Height", 480);
 
         GetConfig()->setString("Window.GfxBackend", "");
+        GetConfig()->setString("Window.GfxApi", "");
         GetConfig()->setString("Window.AudioBackend", "");
 
         GetConfig()->setBool("Window.Fullscreen.Enabled", false);
@@ -306,6 +308,7 @@ void Window::Initialize(const std::vector<std::string>& otrFiles, const std::uno
     }
 
     mGfxBackend = GetConfig()->getString("Window.GfxBackend");
+    gfxApi = GetConfig()->getString("Window.GfxApi");
     InitializeWindowManager();
 
     mAudioBackend = GetConfig()->getString("Window.AudioBackend");
@@ -473,13 +476,18 @@ void Window::InitializeWindowManager() {
     // First set default
 #ifdef ENABLE_OPENGL
     mRenderingApi = &gfx_opengl_api;
+#endif
+#ifdef __APPLE__
+    if (Metal_IsSupported()) {
+        mRenderingApi = &gfx_metal_api;
+    }
+#endif
 #if defined(__linux__) && defined(X11_SUPPORTED)
     // LINUX_TODO:
     // *mWindowManagerApi = &gfx_glx;
     mWindowManagerApi = &gfx_sdl;
 #else
     mWindowManagerApi = &gfx_sdl;
-#endif
 #endif
 #ifdef ENABLE_DX12
     mRenderingApi = &gfx_direct3d12_api;
@@ -501,9 +509,16 @@ void Window::InitializeWindowManager() {
         mWindowManagerApi = &gfx_dxgi_api;
     }
 #endif
-#ifdef ENABLE_OPENGL
+#if defined(ENABLE_OPENGL) || defined(__APPLE__)
     if (mGfxBackend == "sdl") {
-        mRenderingApi = &gfx_opengl_api;
+        if (gfxApi == "OpenGL") {
+            mRenderingApi = &gfx_opengl_api;
+        }
+    #ifdef __APPLE__
+        else if (gfxApi == "Metal") {
+            mRenderingApi = &gfx_metal_api;
+        }
+    #endif
         mWindowManagerApi = &gfx_sdl;
     }
 #if defined(__linux__) && defined(X11_SUPPORTED)
