@@ -609,6 +609,11 @@ static void import_texture_raw(int tile) {
     uint16_t width = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.width;
     uint16_t height = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.height;
     uint8_t type = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.type;
+    const char* texPath = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].debug_tex_path;
+
+    if (strstr(texPath, "gHylianShieldDesignTex")) {
+        int bp = 0;
+    }
 
     gfx_rapi->upload_texture(addr, width, height);
 }
@@ -870,10 +875,15 @@ static void import_texture(int i, int tile) {
     uint8_t fmt = rdp.texture_tile[tile].fmt;
     uint8_t siz = rdp.texture_tile[tile].siz;
     uint32_t texFlags = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].tex_flags;
+    const char* texPath = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].debug_tex_path;
     uint32_t tmem_index = rdp.texture_tile[tile].tmem_index;
 
     if (gfx_texture_cache_lookup(i, tile)) {
         return;
+    }
+
+    if (strstr(texPath, "gHylianShieldDesignTex")) {
+        int bp = 0;
     }
 
     // if load as raw is set then we load_raw();
@@ -1720,7 +1730,6 @@ static void gfx_dp_set_texture_image(uint32_t format, uint32_t size, uint32_t wi
     rdp.texture_to_load.raw_tex_metadata = rawTexMetdata;
     rdp.texture_to_load.debug_tex_path = texPath;
 
-
     if (strstr(texPath, "gHylianShieldDesignTex")) {
         int bp = 0;
     }
@@ -2514,14 +2523,15 @@ static void gfx_run_dl(Gfx* cmd) {
                 fileName = ResourceMgr_GetNameByCRC(hash);
                 uint32_t texFlags = 0;
                 RawTexMetadata rawTexMetdata = {};
-#if _DEBUG && 0
+
                 Ship::Texture* texture = ResourceMgr_LoadTexByCRC(hash);
                 texFlags = texture->texFlags;
-                tex = reinterpret_cast<char*>(texture->imageData);
                 rawTexMetdata.width = texture->width;
                 rawTexMetdata.height = texture->height;
                 rawTexMetdata.type = (int)texture->texType;
 
+#if _DEBUG && 0
+                tex = reinterpret_cast<char*>(texture->imageData);
                 ResourceMgr_GetNameByCRC(hash, fileName);
                 printf("G_SETTIMG_OTR: %s, %08X\n", fileName, hash);
 #else
@@ -2530,14 +2540,12 @@ static void gfx_run_dl(Gfx* cmd) {
 
                 if (addr != 0) {
                     tex = (char*)addr;
-                } else {
-                    Ship::Texture* texture = ResourceMgr_LoadTexByCRC(hash);
-                    texFlags = texture->texFlags;
-                    tex = reinterpret_cast<char*>(texture->imageData);
-                    rawTexMetdata.width = texture->width;
-                    rawTexMetdata.height = texture->height;
-                    rawTexMetdata.type = (int)texture->texType;
 
+                    if (strstr(fileName, "gHylianShieldDesignTex")) {
+                        int bp = 0;
+                    }
+                } else {
+                    tex = reinterpret_cast<char*>(texture->imageData);
                     if (tex != nullptr) {
                         cmd--;
                         uintptr_t oldData = cmd->words.w1;
