@@ -136,7 +136,12 @@ Gfx* ResourceMgr_LoadGfxByCRC(uint64_t crc) {
     }
 }
 
-char* ResourceMgr_LoadTexByCRC(uint64_t crc) {
+Ship::Texture* ResourceMgr_LoadTexByCRC(uint64_t crc) {
+    const std::string* hashStr = Ship::Window::GetInstance()->GetResourceManager()->HashToString(crc);
+    return LOAD_TEX(hashStr->c_str());
+}
+
+char* ResourceMgr_LoadTexDataByCRC(uint64_t crc) {
     const std::string* hashStr = Ship::Window::GetInstance()->GetResourceManager()->HashToString(crc);
 
     if (hashStr != nullptr) {
@@ -165,7 +170,11 @@ void ResourceMgr_RegisterResourcePatch(uint64_t hash, uint32_t instrIndex, uintp
     }
 }
 
-char* ResourceMgr_LoadTexByName(char* texPath) {
+Ship::Texture* ResourceMgr_LoadTexByName(char* texPath) {
+    return LOAD_TEX(texPath);
+}
+
+char* ResourceMgr_LoadTexDataByName(char* texPath) {
     const auto res = LOAD_TEX(texPath);
     Ship::ExecuteHooks<Ship::LoadTexture>(texPath, &res->imageData);
     return (char*)res->imageData;

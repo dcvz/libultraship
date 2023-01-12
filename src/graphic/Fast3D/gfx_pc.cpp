@@ -36,6 +36,7 @@
 #include "menu/ImGuiImpl.h"
 #include "resource/GameVersions.h"
 #include "resource/ResourceMgr.h"
+#include "resource/types/Texture.h"
 #include "misc/Utils.h"
 
 // OTRTODO: fix header files for these
@@ -44,9 +45,11 @@ const char* ResourceMgr_GetNameByCRC(uint64_t crc);
 int32_t* ResourceMgr_LoadMtxByCRC(uint64_t crc);
 Vtx* ResourceMgr_LoadVtxByCRC(uint64_t crc);
 Gfx* ResourceMgr_LoadGfxByCRC(uint64_t crc);
-char* ResourceMgr_LoadTexByCRC(uint64_t crc);
+Ship::Texture* ResourceMgr_LoadTexByCRC(uint64_t crc);
+char* ResourceMgr_LoadTexDataByCRC(uint64_t crc);
 void ResourceMgr_RegisterResourcePatch(uint64_t hash, uint32_t instrIndex, uintptr_t origData);
-char* ResourceMgr_LoadTexByName(char* texPath);
+Ship::Texture* ResourceMgr_LoadTexByName(char* texPath);
+char* ResourceMgr_LoadTexDataByName(char* texPath);
 int ResourceMgr_OTRSigCheck(char* imgData);
 }
 
@@ -133,6 +136,11 @@ static struct RSP {
     struct LoadedVertex loaded_vertices[MAX_VERTICES + 4];
 } rsp;
 
+struct RawTexMetadata {
+    uint16_t width, height;
+    uint8_t type;
+};
+
 static struct RDP {
     const uint8_t* palettes[2];
     struct {
@@ -140,6 +148,8 @@ static struct RDP {
         uint8_t siz;
         uint32_t width;
         const char* otr_path;
+        uint32_t tex_flags;
+        struct RawTexMetadata raw_tex_metadata;
     } texture_to_load;
     struct {
         const uint8_t* addr;
@@ -147,6 +157,8 @@ static struct RDP {
         uint32_t full_image_line_size_bytes;
         uint32_t line_size_bytes;
         const char* otr_path;
+        uint32_t tex_flags;
+        struct RawTexMetadata raw_tex_metadata;
     } loaded_texture[2];
     struct {
         uint8_t fmt;
@@ -591,6 +603,16 @@ static void gfx_texture_cache_delete(const uint8_t* orig_addr) {
     }
 }
 
+static void import_texture_raw(int tile) {
+    const uint8_t* addr = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr;
+
+    uint16_t width = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.width;
+    uint16_t height = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.height;
+    uint8_t type = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.type;
+
+    gfx_rapi->upload_texture(addr, width, height);
+}
+
 static void import_texture_rgba16(int tile) {
     uint8_t rgba32_buf[480 * 240 * 4];
     const uint8_t* addr = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr;
@@ -847,9 +869,16 @@ static void import_texture_ci8(int tile) {
 static void import_texture(int i, int tile) {
     uint8_t fmt = rdp.texture_tile[tile].fmt;
     uint8_t siz = rdp.texture_tile[tile].siz;
+    uint32_t texFlags = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].tex_flags;
     uint32_t tmem_index = rdp.texture_tile[tile].tmem_index;
 
     if (gfx_texture_cache_lookup(i, tile)) {
+        return;
+    }
+
+    // if load as raw is set then we load_raw();
+    if ((texFlags & TEX_FLAG_LOAD_AS_RAW) != 0) {
+        import_texture_raw(tile);
         return;
     }
 
@@ -1683,15 +1712,12 @@ static void gfx_dp_set_scissor(uint32_t mode, uint32_t ulx, uint32_t uly, uint32
     rdp.viewport_or_scissor_changed = true;
 }
 
-static void gfx_dp_set_texture_image(uint32_t format, uint32_t size, uint32_t width, const void* addr,
-                                     const char* otr_path) {
+static void gfx_dp_set_texture_image(uint32_t format, uint32_t size, uint32_t width, uint32_t texFlags, RawTexMetadata rawTexMetdata, const void* addr) {
     rdp.texture_to_load.addr = (const uint8_t*)addr;
     rdp.texture_to_load.siz = size;
     rdp.texture_to_load.width = width;
-    if (otr_path != nullptr && !strncmp(otr_path, "__OTR__", 7)) {
-        otr_path = otr_path + 7;
-    }
-    rdp.texture_to_load.otr_path = otr_path;
+    rdp.texture_to_load.tex_flags = texFlags;
+    rdp.texture_to_load.raw_tex_metadata = rawTexMetdata;
 }
 
 static void gfx_dp_set_tile(uint8_t fmt, uint32_t siz, uint32_t line, uint32_t tmem, uint8_t tile, uint32_t palette,
@@ -1784,6 +1810,8 @@ static void gfx_dp_load_block(uint8_t tile, uint32_t uls, uint32_t ult, uint32_t
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].line_size_bytes = size_bytes;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].full_image_line_size_bytes = size_bytes;
     // assert(size_bytes <= 4096 && "bug: too big texture");
+    rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].tex_flags = rdp.texture_to_load.tex_flags;
+    rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata = rdp.texture_to_load.raw_tex_metadata;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr = rdp.texture_to_load.addr;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].otr_path = rdp.texture_to_load.otr_path;
     rdp.textures_changed[rdp.texture_tile[tile].tmem_index] = true;
@@ -1818,7 +1846,9 @@ static void gfx_dp_load_tile(uint8_t tile, uint32_t uls, uint32_t ult, uint32_t 
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].full_image_line_size_bytes = full_image_line_size_bytes;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].line_size_bytes = line_size_bytes;
 
-    assert(size_bytes <= 4096 && "bug: too big texture");
+//    assert(size_bytes <= 4096 && "bug: too big texture");
+    rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].tex_flags = rdp.texture_to_load.tex_flags;
+    rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata = rdp.texture_to_load.raw_tex_metadata;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr = rdp.texture_to_load.addr + start_offset;
     rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].otr_path = rdp.texture_to_load.otr_path;
     rdp.texture_tile[tile].uls = uls;
@@ -2123,7 +2153,8 @@ static void gfx_s2dex_bg_copy(const uObjBg* bg) {
     bg->b.imageFlip = 0;
     */
     SUPPORT_CHECK(bg->b.imageSiz == G_IM_SIZ_16b);
-    gfx_dp_set_texture_image(G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, bg->b.imagePtr, nullptr);
+    // TODO: Check if this is ever run
+    gfx_dp_set_texture_image(G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, 0, {}, bg->b.imagePtr);
     gfx_dp_set_tile(G_IM_FMT_RGBA, G_IM_SIZ_16b, 0, 0, G_TX_LOADTILE, 0, 0, 0, 0, 0, 0, 0);
     gfx_dp_load_block(G_TX_LOADTILE, 0, 0, (bg->b.imageW * bg->b.imageH >> 4) - 1, 0);
     gfx_dp_set_tile(bg->b.imageFmt, G_IM_SIZ_16b, bg->b.imageW >> 4, 0, G_TX_RENDERTILE, bg->b.imagePal, 0, 0, 0, 0, 0,
@@ -2452,14 +2483,21 @@ static void gfx_run_dl(Gfx* cmd) {
                 uintptr_t i = (uintptr_t)seg_addr(cmd->words.w1);
 
                 char* imgData = (char*)i;
+                uint32_t texFlags = 0;
+                RawTexMetadata rawTexMetdata = {};
 
                 if ((i & 1) != 1) {
                     if (ResourceMgr_OTRSigCheck(imgData) == 1) {
-                        i = (uintptr_t)ResourceMgr_LoadTexByName(imgData);
+                        Ship::Texture* tex = ResourceMgr_LoadTexByName(imgData);
+                        i = (uintptr_t)reinterpret_cast<char*>(tex->imageData);
+                        texFlags = tex->texFlags;
+                        rawTexMetdata.width = tex->width;
+                        rawTexMetdata.height = tex->height;
+                        rawTexMetdata.type = (int)tex->texType;
                     }
                 }
 
-                gfx_dp_set_texture_image(C0(21, 3), C0(19, 2), C0(0, 10), (void*)i, imgData);
+                gfx_dp_set_texture_image(C0(21, 3), C0(19, 2), C0(0, 10), texFlags, rawTexMetdata, (void*)i);
                 break;
             }
             case G_SETTIMG_OTR: {
@@ -2467,8 +2505,16 @@ static void gfx_run_dl(Gfx* cmd) {
                 cmd++;
                 uint64_t hash = ((uint64_t)cmd->words.w0 << 32) + (uint64_t)cmd->words.w1;
                 fileName = ResourceMgr_GetNameByCRC(hash);
+                uint32_t texFlags = 0;
+                RawTexMetadata rawTexMetdata = {};
 #if _DEBUG && 0
-                char* tex = ResourceMgr_LoadTexByCRC(hash);
+                Ship::Texture* texture = ResourceMgr_LoadTexByCRC(hash);
+                texFlags = texture->texFlags;
+                tex = reinterpret_cast<char*>(texture->imageData);
+                rawTexMetdata.width = texture->width;
+                rawTexMetdata.height = texture->height;
+                rawTexMetdata.type = (int)texture->texType;
+
                 ResourceMgr_GetNameByCRC(hash, fileName);
                 printf("G_SETTIMG_OTR: %s, %08X\n", fileName, hash);
 #else
@@ -2478,7 +2524,12 @@ static void gfx_run_dl(Gfx* cmd) {
                 if (addr != 0) {
                     tex = (char*)addr;
                 } else {
-                    tex = ResourceMgr_LoadTexByCRC(hash);
+                    Ship::Texture* texture = ResourceMgr_LoadTexByCRC(hash);
+                    texFlags = texture->texFlags;
+                    tex = reinterpret_cast<char*>(texture->imageData);
+                    rawTexMetdata.width = texture->width;
+                    rawTexMetdata.height = texture->height;
+                    rawTexMetdata.type = (int)texture->texType;
 
                     if (tex != nullptr) {
                         cmd--;
@@ -2500,7 +2551,7 @@ static void gfx_run_dl(Gfx* cmd) {
                 uint32_t width = C0(0, 10);
 
                 if (tex != NULL) {
-                    gfx_dp_set_texture_image(fmt, size, width, tex, fileName);
+                    gfx_dp_set_texture_image(fmt, size, width, texFlags, rawTexMetdata, tex);
                 }
 
                 cmd++;
