@@ -171,12 +171,20 @@ void ResourceMgr_RegisterResourcePatch(uint64_t hash, uint32_t instrIndex, uintp
 }
 
 Ship::Texture* ResourceMgr_LoadTexByName(char* texPath) {
+    if(strcmp(texPath, "__OTR__virtual/gEmptyTexture") == 0) {
+        Ship::Texture* dummy = new Ship::Texture;
+        dummy->texType = Ship::TextureType::RGBA32bpp;
+        dummy->texFlags = (1 << 0);
+        dummy->imageData = new uint8_t[]{ 0, 0, 0, 0 };
+        dummy->width = 1;
+        dummy->height = 1;
+        return dummy;
+    }
     return LOAD_TEX(texPath);
 }
 
 char* ResourceMgr_LoadTexDataByName(char* texPath) {
     const auto res = LOAD_TEX(texPath);
-    Ship::ExecuteHooks<Ship::LoadTexture>(texPath, &res->imageData);
     return (char*)res->imageData;
 }
 
