@@ -882,7 +882,7 @@ static void import_texture(int i, int tile) {
         return;
     }
 
-    if (strstr(texPath, "gHylianShieldDesignTex")) {
+    if (texPath != nullptr && strstr(texPath, "gHylianShieldDesignTex")) {
         int bp = 0;
     }
 
@@ -1730,7 +1730,7 @@ static void gfx_dp_set_texture_image(uint32_t format, uint32_t size, uint32_t wi
     rdp.texture_to_load.raw_tex_metadata = rawTexMetdata;
     rdp.texture_to_load.debug_tex_path = texPath;
 
-    if (strstr(texPath, "gHylianShieldDesignTex")) {
+    if (texPath != nullptr && strstr(texPath, "gHylianShieldDesignTex")) {
         int bp = 0;
     }
 }
