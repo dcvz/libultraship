@@ -138,7 +138,7 @@ static struct RSP {
 
 struct RawTexMetadata {
     uint16_t width, height;
-    uint8_t type;
+    Ship::TextureType type;
 };
 
 static struct RDP {
@@ -603,16 +603,63 @@ static void gfx_texture_cache_delete(const uint8_t* orig_addr) {
     }
 }
 
+static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t height, Ship::TextureType type) {
+    uint8_t rgba32_buf[width * height * 4];
+    uint8_t pal_idx = rdp.texture_tile[tile].palette;
+    const uint8_t* palette = rdp.palettes[pal_idx / 8] + (pal_idx % 8) * 16 * 2; // 16 pixel entries, 16 bits each
+
+    if (type == Ship::TextureType::Palette4bpp) {
+        for (int i = 0; i < width * height; i++) {
+            uint8_t byte = addr[i / 2];
+            uint8_t idx = (byte >> (4 - (i % 2) * 4)) & 0xf;
+            uint16_t col16 = (palette[idx * 2] << 8) | palette[idx * 2 + 1]; // Big endian load
+            uint8_t a = col16 & 1;
+            uint8_t r = col16 >> 11;
+            uint8_t g = (col16 >> 6) & 0x1f;
+            uint8_t b = (col16 >> 1) & 0x1f;
+            rgba32_buf[4 * i + 0] = SCALE_5_8(r);
+            rgba32_buf[4 * i + 1] = SCALE_5_8(g);
+            rgba32_buf[4 * i + 2] = SCALE_5_8(b);
+            rgba32_buf[4 * i + 3] = a ? 255 : 0;
+        }
+    } else if (type == Ship::TextureType::Palette8bpp) {
+        for (int i = 0; i < width * height; i++) {
+            int idx = addr[i];
+            uint16_t col16 = (palette[idx * 2] << 8) | palette[idx * 2 + 1]; // Big endian load
+            uint8_t a = col16 & 1;
+            uint8_t r = col16 >> 11;
+            uint8_t g = (col16 >> 6) & 0x1f;
+            uint8_t b = (col16 >> 1) & 0x1f;
+            rgba32_buf[4 * i + 0] = SCALE_5_8(r);
+            rgba32_buf[4 * i + 1] = SCALE_5_8(g);
+            rgba32_buf[4 * i + 2] = SCALE_5_8(b);
+            rgba32_buf[4 * i + 3] = a ? 255 : 0;
+        }
+    }
+
+    gfx_rapi->upload_texture(rgba32_buf, width, height);
+}
+
 static void import_texture_raw(int tile) {
     const uint8_t* addr = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr;
 
     uint16_t width = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.width;
     uint16_t height = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.height;
-    uint8_t type = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.type;
+    Ship::TextureType type = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.type;
     const char* texPath = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].debug_tex_path;
 
-    if (strstr(texPath, "gHylianShieldDesignTex")) {
+    if (type != Ship::TextureType::RGBA32bpp) {
         int bp = 0;
+    }
+
+    // if texture type is CI4 or CI8 we need to apply tlut to it (remember addr corresponds to an rgba32 texture)
+    switch (type) {
+        case Ship::TextureType::Palette4bpp:
+        case Ship::TextureType::Palette8bpp:
+            apply_tlut(tile, addr, width, height, type);
+            return;
+        default:
+            break;
     }
 
     gfx_rapi->upload_texture(addr, width, height);
@@ -2509,7 +2556,7 @@ static void gfx_run_dl(Gfx* cmd) {
                         texFlags = tex->texFlags;
                         rawTexMetdata.width = tex->width;
                         rawTexMetdata.height = tex->height;
-                        rawTexMetdata.type = (int)tex->texType;
+                        rawTexMetdata.type = tex->texType;
                     }
                 }
 
@@ -2528,7 +2575,7 @@ static void gfx_run_dl(Gfx* cmd) {
                 texFlags = texture->texFlags;
                 rawTexMetdata.width = texture->width;
                 rawTexMetdata.height = texture->height;
-                rawTexMetdata.type = (int)texture->texType;
+                rawTexMetdata.type = texture->texType;
 
 #if _DEBUG && 0
                 tex = reinterpret_cast<char*>(texture->imageData);
