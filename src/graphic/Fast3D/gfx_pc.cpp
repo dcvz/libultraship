@@ -108,8 +108,8 @@ struct ColorCombiner {
     uint8_t shader_input_mapping[2][7];
 };
 
-static map<uint64_t, struct ColorCombiner> color_combiner_pool;
-static map<uint64_t, struct ColorCombiner>::iterator prev_combiner = color_combiner_pool.end();
+static unordered_map<uint64_t, struct ColorCombiner> color_combiner_pool;
+static unordered_map<uint64_t, struct ColorCombiner>::iterator prev_combiner = color_combiner_pool.end();
 
 static struct RSP {
     float modelview_matrix_stack[11][4][4];
@@ -604,11 +604,11 @@ static void gfx_texture_cache_delete(const uint8_t* orig_addr) {
 }
 
 static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t height, Ship::TextureType type) {
-    uint8_t rgba32_buf[width * height * 4];
+    uint8_t* rgba32_buf = new uint8_t[width * height * 4];
     uint8_t pal_idx = rdp.texture_tile[tile].palette;
-    const uint8_t* palette = rdp.palettes[pal_idx / 8] + (pal_idx % 8) * 16 * 2; // 16 pixel entries, 16 bits each
 
     if (type == Ship::TextureType::Palette4bpp) {
+        const uint8_t* palette = rdp.palettes[pal_idx / 8] + (pal_idx % 8) * 16 * 2;
         for (int i = 0; i < width * height; i++) {
             uint8_t byte = addr[i / 2];
             uint8_t idx = (byte >> (4 - (i % 2) * 4)) & 0xf;
@@ -624,8 +624,8 @@ static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t h
         }
     } else if (type == Ship::TextureType::Palette8bpp) {
         for (int i = 0; i < width * height; i++) {
-            int idx = addr[i];
-            uint16_t col16 = (palette[idx * 2] << 8) | palette[idx * 2 + 1]; // Big endian load
+            uint8_t idx = addr[i];
+            uint16_t col16 = (rdp.palettes[idx / 128][(idx % 128) * 2] << 8) | rdp.palettes[idx / 128][(idx % 128) * 2 + 1]; // Big endian load
             uint8_t a = col16 & 1;
             uint8_t r = col16 >> 11;
             uint8_t g = (col16 >> 6) & 0x1f;
@@ -642,10 +642,11 @@ static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t h
 
 static void import_texture_raw(int tile) {
     const uint8_t* addr = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].addr;
+    RawTexMetadata metadata = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata;
 
-    uint16_t width = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.width;
-    uint16_t height = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.height;
-    Ship::TextureType type = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].raw_tex_metadata.type;
+    uint16_t width = metadata.width;
+    uint16_t height = metadata.height;
+    Ship::TextureType type = metadata.type;
     const char* texPath = rdp.loaded_texture[rdp.texture_tile[tile].tmem_index].debug_tex_path;
 
     if (type != Ship::TextureType::RGBA32bpp) {
