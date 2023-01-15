@@ -46,6 +46,7 @@
 extern "C" {
 struct OSMesgQueue;
 
+std::unordered_map<std::string, uint8_t*> mTextureModifiers;
 uint8_t __osMaxControllers = MAXCONTROLLERS;
 
 int32_t osContInit(OSMesgQueue* mq, uint8_t* controllerBits, OSContStatus* status) {
@@ -168,6 +169,31 @@ void ResourceMgr_RegisterResourcePatch(uint64_t hash, uint32_t instrIndex, uintp
     }
 }
 
+bool ResourceMgr_HasTexModifier(const char* texPath){
+    return mTextureModifiers.contains(texPath);
+}
+
+void ResourceMgr_RegisterTexModifier(char* texPath, uint8_t* modifier) {
+    if(mTextureModifiers.contains(texPath)) {
+        free(mTextureModifiers[texPath]);
+    }
+    mTextureModifiers[texPath] = modifier;
+}
+
+uint8_t* ResourceMgr_LoadTexModifier(const char* texPath){
+    if(mTextureModifiers.contains(texPath)){
+        return mTextureModifiers[texPath];
+    }
+    return nullptr;
+}
+
+void ResourceMgr_RemoveTexModifier(const char* texPath){
+    if(mTextureModifiers.contains(texPath)){
+        free(mTextureModifiers[texPath]);
+        mTextureModifiers.erase(texPath);
+    }
+}
+
 Ship::Texture* ResourceMgr_LoadTexByName(char* texPath) {
     if(strcmp(texPath, "__OTR__virtual/gEmptyTexture") == 0) {
         Ship::Texture* dummy = new Ship::Texture;
@@ -214,6 +240,16 @@ uint32_t ResourceMgr_LoadTexSizeByName(char* texPath) {
 
     SPDLOG_ERROR("Given texture path is a non-existent resource");
     return -1;
+}
+
+void ResourceMgr_LoadTextureSizeByName(char* texPath, uint16_t* width, uint16_t* height){
+    const auto res = LOAD_TEX(texPath);
+    if (res != nullptr) {
+        *width = res->width;
+        *height = res->height;
+    } else {
+        SPDLOG_ERROR("Given texture path is a non-existent resource");
+    }
 }
 
 void ResourceMgr_WriteTexS16ByName(char* texPath, size_t index, s16 value) {
