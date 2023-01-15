@@ -604,7 +604,7 @@ static void gfx_texture_cache_delete(const uint8_t* orig_addr) {
 }
 
 static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t height, Ship::TextureType type) {
-    uint8_t* rgba32_buf = new uint8_t[width * height * 4];
+    uint8_t rgba32_buf[width * height * 4];
     uint8_t pal_idx = rdp.texture_tile[tile].palette;
 
     if (type == Ship::TextureType::Palette4bpp) {
@@ -638,7 +638,6 @@ static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t h
     }
 
     gfx_rapi->upload_texture(rgba32_buf, width, height);
-    delete[] rgba32_buf;
 }
 
 static void import_texture_raw(int tile) {
