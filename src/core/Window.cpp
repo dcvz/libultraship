@@ -146,8 +146,6 @@ char* ResourceMgr_LoadTexDataByCRC(uint64_t crc) {
 
     if (hashStr != nullptr) {
         const auto res = LOAD_TEX(hashStr->c_str());
-        Ship::ExecuteHooks<Ship::LoadTexture>(hashStr->c_str(), &res->imageData);
-
         return reinterpret_cast<char*>(res->imageData);
     } else {
         return nullptr;
