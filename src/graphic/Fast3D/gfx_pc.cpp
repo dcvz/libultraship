@@ -638,6 +638,7 @@ static void apply_tlut(int tile, const uint8_t* addr, uint16_t width, uint16_t h
     }
 
     gfx_rapi->upload_texture(rgba32_buf, width, height);
+    delete[] rgba32_buf;
 }
 
 static void import_texture_raw(int tile) {
