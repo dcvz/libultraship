@@ -923,46 +923,98 @@ ImTextureID GetTextureByID(int id) {
     return reinterpret_cast<ImTextureID>(id);
 }
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#define SSE_SUP_INSTR 1
+#elif defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64)
+#define SSE_SUP_INSTR 1
+#include "sse2neon/SSE2NEON.h"
+#endif
+
 void LoadResource(const std::string& name, const std::string& path, const ImVec4& tint) {
     GfxRenderingAPI* api = gfx_get_current_rendering_api();
     const auto res = static_cast<Ship::Texture*>(Window::GetInstance()->GetResourceManager()->LoadResource(path).get());
 
-    std::vector<uint8_t> texBuffer;
-    texBuffer.reserve(res->Width * res->Height * 4);
+    uint8_t* cImageData = (uint8_t*)res->ImageData;
+    static std::vector<uint8_t> texBuffer;
+
+    uint8_t tint_x, tint_y, tint_z, tint_w;
+
+    // approximation, often its just 1.0 and alpha gets like 0.3
+    tint_x = (uint8_t)(tint.x * 255);
+    tint_y = (uint8_t)(tint.y * 255);
+    tint_z = (uint8_t)(tint.z * 255);
+    tint_w = (uint8_t)(tint.w * 255);
+
+#ifdef SSE_SUP_INSTR
+    __m128i tint_values_16_x = _mm_unpacklo_epi8(_mm_set1_epi8((int8_t)tint_x), _mm_setzero_si128());
+    __m128i tint_values_16_y = _mm_unpacklo_epi8(_mm_set1_epi8((int8_t)tint_y), _mm_setzero_si128());
+    __m128i tint_values_16_z = _mm_unpacklo_epi8(_mm_set1_epi8((int8_t)tint_z), _mm_setzero_si128());
+    __m128i tint_values_16_w = _mm_unpacklo_epi8(_mm_set1_epi8((int8_t)tint_w), _mm_setzero_si128());
+#endif
 
     switch (res->Type) {
-        case Ship::TextureType::RGBA32bpp:
-            texBuffer.assign(res->ImageData, res->ImageData + (res->Width * res->Height * 4));
+        case Ship::TextureType::RGBA32bpp: {
+            // Only allocs if its bigger
+            texBuffer.reserve(res->Width * res->Height * 4);
+            cImageData = texBuffer.data();
+#ifndef SSE_SUP_INSTR
+            for (size_t pixel = 0; pixel < res->Width * res->Height * 4; pixel += 4) {
+                cImageData[pixel + 0] = (res->ImageData[pixel + 0] * tint_x) / 255;
+                cImageData[pixel + 1] = (res->ImageData[pixel + 1] * tint_y) / 255;
+                cImageData[pixel + 2] = (res->ImageData[pixel + 2] * tint_z) / 255;
+                cImageData[pixel + 3] = (res->ImageData[pixel + 3] * tint_w) / 255;
+            }
+#else
+            for (size_t pixel = 0; pixel < res->Width * res->Height * 4; pixel += 16) {
+                __m128i rgba_16 = _mm_loadu_si128((__m128i*)(&res->ImageData[pixel]));
+                __m128i rgba_16_b = _mm_unpacklo_epi8(rgba_16, _mm_setzero_si128());
+                __m128i rgba_16_g = _mm_unpackhi_epi8(rgba_16, _mm_setzero_si128());
+                __m128i rgba_16_r = _mm_mullo_epi16(rgba_16_b, tint_values_16_z);
+                __m128i rgba_16_a = _mm_mullo_epi16(rgba_16_g, tint_values_16_w);
+                rgba_16_r = _mm_srli_epi16(rgba_16_r, 8);
+                rgba_16_a = _mm_srli_epi16(rgba_16_a, 8);
+
+
+                rgba_16_b = _mm_mullo_epi16(rgba_16_b, tint_values_16_x);
+                rgba_16_b = _mm_srli_epi16(rgba_16_b, 8);
+                rgba_16_g = _mm_mullo_epi16(rgba_16_g, tint_values_16_y);
+                rgba_16_g = _mm_srli_epi16(rgba_16_g, 8);
+
+                rgba_16 = _mm_packus_epi16(rgba_16_b, rgba_16_g);
+                rgba_16 = _mm_packus_epi16(rgba_16_r, rgba_16_a);
+                _mm_storeu_si128((__m128i*)(cImageData + pixel), rgba_16);
+            }
+#endif
             break;
-        case Ship::TextureType::GrayscaleAlpha8bpp:
+        }
+        case Ship::TextureType::GrayscaleAlpha8bpp: {
+            // Only allocs if its bigger
+            texBuffer.reserve(res->Width * res->Height * 4);
+            cImageData = texBuffer.data();
             for (int32_t i = 0; i < res->Width * res->Height; i++) {
                 uint8_t ia = res->ImageData[i];
                 uint8_t color = ((ia >> 4) & 0xF) * 255 / 15;
                 uint8_t alpha = (ia & 0xF) * 255 / 15;
-                texBuffer.push_back(color);
-                texBuffer.push_back(color);
-                texBuffer.push_back(color);
-                texBuffer.push_back(alpha);
+                cImageData[i * 4 + 0] = (res->ImageData[i * 4 + 0] * tint_x) / 255;
+                cImageData[i * 4 + 1] = (res->ImageData[i * 4 + 1] * tint_y) / 255;
+                cImageData[i * 4 + 2] = (res->ImageData[i * 4 + 2] * tint_z) / 255;
+                cImageData[i * 4 + 3] = (res->ImageData[i * 4 + 3] * tint_w) / 255;
             }
             break;
+        }
         default:
             // TODO convert other image types
             SPDLOG_WARN("SohImGui::LoadResource: Attempting to load unsupporting image type %s", path.c_str());
             return;
     }
 
-    for (size_t pixel = 0; pixel < texBuffer.size() / 4; pixel++) {
-        texBuffer[pixel * 4 + 0] *= tint.x;
-        texBuffer[pixel * 4 + 1] *= tint.y;
-        texBuffer[pixel * 4 + 2] *= tint.z;
-        texBuffer[pixel * 4 + 3] *= tint.w;
-    }
 
     const auto asset = new GameAsset{ api->new_texture() };
 
     api->select_texture(0, asset->textureId);
     api->set_sampler_parameters(0, false, 0, 0);
-    api->upload_texture(texBuffer.data(), res->Width, res->Height);
+    api->upload_texture(cImageData, res->Width, res->Height);
 
     DefaultAssets[name] = asset;
 }

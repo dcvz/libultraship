@@ -123,3 +123,10 @@ add_library(StrHash64 STATIC)
 target_sources(StrHash64 PRIVATE ${STRHASH64_DIR}/StrHash64.cpp)
 
 target_include_directories(StrHash64 PUBLIC ${STRHASH64_DIR})
+
+#=================== sse2neon ===================
+
+set(SSE2NEON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/sse2neon)
+add_library(sse2neon INTERFACE)
+
+target_include_directories(sse2neon INTERFACE ${SSE2NEON_DIR})

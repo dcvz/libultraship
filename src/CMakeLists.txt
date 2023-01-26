@@ -355,7 +355,7 @@ endif()
 #=================== Linking ===================
 
 target_link_libraries(libultraship
-    PRIVATE ZAPDUtils StrHash64
+    PRIVATE ZAPDUtils StrHash64 sse2neon
     PUBLIC ImGui Mercury storm tinyxml2
 )
 
