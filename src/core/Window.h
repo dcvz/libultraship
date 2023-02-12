@@ -62,7 +62,7 @@ class Window {
     int32_t GetLastScancode();
     void SetLastScancode(int32_t scanCode);
     void InitializeAudioPlayer(std::string_view audioBackend);
-    void InitializeWindowManager(std::string_view gfxBackend);
+    void InitializeWindowManager(std::string_view gfxBackend, std::string_view gfxApi);
     bool DoesOtrFileExist();
 
   protected:
@@ -94,6 +94,7 @@ class Window {
     std::shared_ptr<SpeechSynthesizer> mSpeechSynthesizer;
 
     std::string mGfxBackend;
+    std::string mGfxApi;
     std::string mAudioBackend;
     GfxRenderingAPI* mRenderingApi;
     GfxWindowManagerAPI* mWindowManagerApi;

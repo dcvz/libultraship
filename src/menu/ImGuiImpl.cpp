@@ -36,6 +36,10 @@
 #if __APPLE__
 #include <SDL_hints.h>
 #include <SDL_video.h>
+
+#include "graphic/Fast3D/gfx_metal.h"
+#include <ImGui/backends/imgui_impl_metal.h>
+#include <ImGui/backends/imgui_impl_sdl2.h>
 #else
 #include <SDL2/SDL_hints.h>
 #include <SDL2/SDL_video.h>
@@ -153,14 +157,29 @@ void InitSettings() {
 
 void PopulateBackendIds(std::shared_ptr<Mercury> cfg) {
     std::string renderingBackend = cfg->getString("Window.GfxBackend");
-    if (renderingBackend.empty()) {
+    std::string gfxApi = cfg->getString("Window.GfxApi");
+
+    int matchType = 2; // 0 = backend, 1 = gfxApi, 2 = both
+
+    if (renderingBackend.empty() && gfxApi.empty()) {
         lastRenderingBackendID = 0;
-    } else {
-        for (size_t i = 0; i < renderingBackends.size(); i++) {
-            if (renderingBackend == renderingBackends[i].first) {
-                lastRenderingBackendID = i;
-                break;
-            }
+    } else if (gfxApi.empty()) { // only backend is set
+        matchType = 0;
+    } else if (renderingBackend.empty()) { // only gfxApi is set
+        matchType = 1;
+    }
+
+    for (size_t i = 0; i < renderingBackends.size(); i++) {
+        if (matchType == 0 && renderingBackend == renderingBackends[i].first) {
+            lastRenderingBackendID = i;
+        }
+
+        if (matchType == 1 && gfxApi == renderingBackends[i].second) {
+            lastRenderingBackendID = i;
+        }
+
+        if (matchType == 2 && renderingBackend == renderingBackends[i].first && gfxApi == renderingBackends[i].second) {
+            lastRenderingBackendID = i;
         }
     }
 
@@ -186,8 +205,13 @@ void ImGuiWMInit() {
 #else
         case Backend::SDL:
             SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+            if (impl.metal.window) {
+                ImGui_ImplSDL2_InitForMetal(static_cast<SDL_Window*>(impl.metal.window));
+                break;
+            }
+
             SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-            ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(impl.sdl.window), impl.sdl.context);
+            ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(impl.opengl.window), impl.opengl.context);
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -208,7 +232,12 @@ void ImGuiBackendInit() {
             break;
 #else
         case Backend::SDL:
-#if defined(__APPLE__)
+#ifdef __APPLE__
+            if (impl.metal.renderer) {
+                Metal_Init(impl.metal.renderer);
+                break;
+            }
+
             ImGui_ImplOpenGL3_Init("#version 410 core");
 #else
             ImGui_ImplOpenGL3_Init("#version 120");
@@ -260,7 +289,7 @@ void ImGuiWMNewFrame() {
             break;
 #else
         case Backend::SDL:
-            ImGui_ImplSDL2_NewFrame(static_cast<SDL_Window*>(impl.sdl.window));
+            ImGui_ImplSDL2_NewFrame();
             break;
 #endif
 #if defined(ENABLE_DX11) || defined(ENABLE_DX12)
@@ -282,6 +311,12 @@ void ImGuiBackendNewFrame() {
             break;
 #else
         case Backend::SDL:
+#ifdef __APPLE__
+            if (impl.metal.renderer) {
+                Metal_NewFrame(impl.metal.renderer);
+                break;
+            }
+#endif
             ImGui_ImplOpenGL3_NewFrame();
             break;
 #endif
@@ -308,6 +343,12 @@ void ImGuiRenderDrawData(ImDrawData* data) {
             break;
 #else
         case Backend::SDL:
+#ifdef __APPLE__
+            if (impl.metal.renderer) {
+                Metal_RenderDrawData(data);
+                break;
+            }
+#endif
             ImGui_ImplOpenGL3_RenderDrawData(data);
             break;
 #endif
@@ -392,6 +433,12 @@ void Init(WindowImpl window_impl) {
     CVarRegisterInteger("gEnableMultiViewports", 1);
 #ifdef __SWITCH__
     Ship::Switch::ImGuiSetupFont(io->Fonts);
+#endif
+
+#ifdef __APPLE__
+    if (Metal_IsSupported()) {
+        renderingBackends.insert(renderingBackends.begin(), { "sdl", "Metal" });
+    }
 #endif
 
 #ifdef __WIIU__
@@ -790,7 +837,7 @@ void Render() {
     ImGui::Render();
     ImGuiRenderDrawData(ImGui::GetDrawData());
     if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        if (impl.backend == Backend::SDL) {
+        if (impl.backend == Backend::SDL && impl.opengl.context != nullptr) {
             SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
             SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
 
@@ -842,6 +889,7 @@ std::pair<const char*, const char*> GetCurrentAudioBackend() {
 
 void SetCurrentRenderingBackend(uint8_t index, std::pair<const char*, const char*> backend) {
     Window::GetInstance()->GetConfig()->setString("Window.GfxBackend", backend.first);
+    Window::GetInstance()->GetConfig()->setString("Window.GfxApi", backend.second);
     lastRenderingBackendID = index;
 }
 
@@ -930,6 +978,11 @@ ImTextureID GetTextureByID(int id) {
 #ifdef ENABLE_DX11
     if (impl.backend == Backend::DX11) {
         return gfx_d3d11_get_texture_by_id(id);
+    }
+#endif
+#ifdef __APPLE__
+    if (impl.metal.window) {
+        return gfx_metal_get_texture_by_id(id);
     }
 #endif
 #ifdef __WIIU__
