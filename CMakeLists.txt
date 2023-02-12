@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.16.0)
 project(libultraship LANGUAGES C CXX)
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     enable_language(OBJCXX)
+    set(CMAKE_OBJC_FLAGS "${CMAKE_OBJC_FLAGS} -fobjc-arc")
+    set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc")
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -22,5 +24,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND USE_AUTO_VCPKG)
 endif()
 
 add_subdirectory("extern")
-add_subdirectory("src")
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    add_subdirectory("extern_macos")
+endif()
+
+add_subdirectory("src")
