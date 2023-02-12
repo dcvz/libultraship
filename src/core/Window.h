@@ -34,6 +34,7 @@ class Window {
     void MainLoop(void (*MainFunction)(void));
     void Initialize(const std::vector<std::string>& otrFiles = {},
                     const std::unordered_set<uint32_t>& validHashes = {});
+    void Close();
     void StartFrame();
     void SetTargetFps(int32_t fps);
     void SetMaximumFrameLatency(int32_t latency);
@@ -61,7 +62,7 @@ class Window {
     int32_t GetLastScancode();
     void SetLastScancode(int32_t scanCode);
     void InitializeAudioPlayer(std::string_view audioBackend);
-    void InitializeWindowManager(std::string_view gfxBackend);
+    void InitializeWindowManager(std::string_view gfxBackend, std::string_view gfxApi);
     bool DoesOtrFileExist();
 
   protected:
@@ -93,6 +94,7 @@ class Window {
     std::shared_ptr<SpeechSynthesizer> mSpeechSynthesizer;
 
     std::string mGfxBackend;
+    std::string mGfxApi;
     std::string mAudioBackend;
     GfxRenderingAPI* mRenderingApi;
     GfxWindowManagerAPI* mWindowManagerApi;

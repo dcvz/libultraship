@@ -13,6 +13,7 @@
 #include "graphic/Fast3D/gfx_dxgi.h"
 #include "graphic/Fast3D/gfx_glx.h"
 #include "graphic/Fast3D/gfx_opengl.h"
+#include "graphic/Fast3D/gfx_metal.h"
 #include "graphic/Fast3D/gfx_direct3d11.h"
 #include "graphic/Fast3D/gfx_direct3d12.h"
 #include "graphic/Fast3D/gfx_wiiu.h"
@@ -73,6 +74,7 @@ void Window::CreateDefaults() {
         GetConfig()->setInt("Window.Height", 480);
 
         GetConfig()->setString("Window.GfxBackend", "");
+        GetConfig()->setString("Window.GfxApi", "");
         GetConfig()->setString("Window.AudioBackend", "");
 
         GetConfig()->setBool("Window.Fullscreen.Enabled", false);
@@ -126,7 +128,7 @@ void Window::Initialize(const std::vector<std::string>& otrFiles, const std::uno
         mHeight = GetConfig()->getInt("Window.Height", 480);
     }
 
-    InitializeWindowManager(GetConfig()->getString("Window.GfxBackend"));
+    InitializeWindowManager(GetConfig()->getString("Window.GfxBackend"), GetConfig()->getString("Window.GfxApi"));
     InitializeAudioPlayer(GetConfig()->getString("Window.AudioBackend"));
 
     InitializeSpeechSynthesis();
@@ -136,6 +138,10 @@ void Window::Initialize(const std::vector<std::string>& otrFiles, const std::uno
     mWindowManagerApi->set_keyboard_callbacks(KeyDown, KeyUp, AllKeysUp);
 
     Ship::RegisterHook<ExitGame>([this]() { mControlDeck->SaveControllerSettings(); });
+}
+
+void Window::Close() {
+    mWindowManagerApi->close();
 }
 
 std::string Window::GetAppDirectoryPath() {
@@ -271,6 +277,11 @@ float Window::GetCurrentAspectRatio() {
 void Window::InitializeAudioPlayer(std::string_view audioBackend) {
     // Param can override
     mAudioBackend = audioBackend;
+#ifdef __APPLE__
+    if (mAudioBackend == "coreaudio") {
+        mAudioPlayer = std::make_shared<OSXAudioPlayer>();
+    }
+#endif
 #ifdef _WIN32
     if (audioBackend == "wasapi") {
         mAudioPlayer = std::make_shared<WasapiAudioPlayer>();
@@ -289,7 +300,9 @@ void Window::InitializeAudioPlayer(std::string_view audioBackend) {
     }
 
     // Defaults if not on list above
-#ifdef _WIN32
+#ifdef __APPLE__
+    mAudioPlayer = std::make_shared<OSXAudioPlayer>();
+#elif defined(_WIN32)
     mAudioPlayer = std::make_shared<WasapiAudioPlayer>();
 #elif defined(__linux)
     mAudioPlayer = std::make_shared<PulseAudioPlayer>();
@@ -298,9 +311,10 @@ void Window::InitializeAudioPlayer(std::string_view audioBackend) {
 #endif
 }
 
-void Window::InitializeWindowManager(std::string_view gfxBackend) {
+void Window::InitializeWindowManager(std::string_view gfxBackend, std::string_view gfxApi) {
     // Param can override
     mGfxBackend = gfxBackend;
+    mGfxApi = gfxApi;
 #ifdef ENABLE_DX11
     if (gfxBackend == "dx11") {
         mRenderingApi = &gfx_direct3d11_api;
@@ -308,11 +322,17 @@ void Window::InitializeWindowManager(std::string_view gfxBackend) {
         return;
     }
 #endif
-#ifdef ENABLE_OPENGL
+#if defined(ENABLE_OPENGL) || defined(__APPLE__)
     if (gfxBackend == "sdl") {
-        mRenderingApi = &gfx_opengl_api;
+        if (gfxApi == "OpenGL") {
+            mRenderingApi = &gfx_opengl_api;
+        }
+#ifdef __APPLE__
+        else if (gfxApi == "Metal") {
+            mRenderingApi = &gfx_metal_api;
+        }
+#endif
         mWindowManagerApi = &gfx_sdl;
-        return;
     }
 #if defined(__linux__) && defined(X11_SUPPORTED)
     if (gfxBackend == "glx") {
@@ -326,13 +346,18 @@ void Window::InitializeWindowManager(std::string_view gfxBackend) {
     // Defaults if not on list above
 #ifdef ENABLE_OPENGL
     mRenderingApi = &gfx_opengl_api;
+#endif
+#ifdef __APPLE__
+    if (Metal_IsSupported()) {
+        mRenderingApi = &gfx_metal_api;
+    }
+#endif
 #if defined(__linux__) && defined(X11_SUPPORTED)
     // LINUX_TODO:
     // *mWindowManagerApi = &gfx_glx;
     mWindowManagerApi = &gfx_sdl;
 #else
     mWindowManagerApi = &gfx_sdl;
-#endif
 #endif
 #ifdef ENABLE_DX12
     mRenderingApi = &gfx_direct3d12_api;
@@ -372,6 +397,9 @@ void Window::InitializeLogging() {
 
 #if (!defined(_WIN32) && !defined(__WIIU__)) || defined(_DEBUG)
 #if defined(_DEBUG) && defined(_WIN32)
+        // LLVM on Windows allocs a hidden console in its entrypoint function.
+        // We free that console here to create our own. Not ifdef'd because
+        FreeConsole();
         if (AllocConsole() == 0) {
             throw std::system_error(GetLastError(), std::generic_category(), "Failed to create debug console");
         }
