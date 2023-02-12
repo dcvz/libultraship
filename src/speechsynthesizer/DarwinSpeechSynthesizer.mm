@@ -12,7 +12,7 @@ namespace Ship {
 DarwinSpeechSynthesizer::DarwinSpeechSynthesizer() {}
 
 bool DarwinSpeechSynthesizer::DoInit() {
-    mSynthesizer = (__bridge_retained void*)[[AVSpeechSynthesizer alloc] init];
+    mSynthesizer = (__bridge_retained void *)[[AVSpeechSynthesizer alloc] init];
     return true;
 }
 

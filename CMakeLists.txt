@@ -24,5 +24,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND USE_AUTO_VCPKG)
 endif()
 
 add_subdirectory("extern")
-add_subdirectory("src")
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    add_subdirectory("extern_macos")
+endif()
+
+add_subdirectory("src")

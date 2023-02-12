@@ -18,7 +18,10 @@ set(Source_Files__Audio
     ${CMAKE_CURRENT_SOURCE_DIR}/audio/PulseAudioPlayer.cpp
 )
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND Source_Files__Audio ${CMAKE_CURRENT_SOURCE_DIR}/audio/OSXAudioPlayer.h)
+    list(APPEND Source_Files__Audio ${CMAKE_CURRENT_SOURCE_DIR}/audio/OSXAudioPlayer.mm)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND Source_Files__Audio ${CMAKE_CURRENT_SOURCE_DIR}/audio/WasapiAudioPlayer.h)
     list(APPEND Source_Files__Audio ${CMAKE_CURRENT_SOURCE_DIR}/audio/WasapiAudioPlayer.cpp)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -353,13 +356,18 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_include_directories(libultraship PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../extern/metal-cpp)
 endif()
 
-
 #=================== Packages & Includes ===================
 
 target_include_directories(libultraship
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../extern
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../extern/spdlog/include ${CMAKE_CURRENT_SOURCE_DIR}/../extern/stb
 )
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../extern_macos
+    )
+endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     target_include_directories(${PROJECT_NAME} PRIVATE
@@ -383,9 +391,14 @@ endif()
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     find_Library(OSX_FOUNDATION Foundation)
     find_Library(OSX_AVFOUNDATION AVFoundation)
-    find_library(METAL Metal)
-    find_library(QUARTZCORE QuartzCore)
-    target_link_libraries(libultraship PRIVATE ${OSX_FOUNDATION} ${OSX_AVFOUNDATION} ${METAL} ${QUARTZCORE} ${CMAKE_DL_LIBS})
+    find_Library(OSX_COREFOUNDATION CoreFoundation)
+    find_Library(OSX_COREAUDIO CoreAudio)
+    find_Library(OSX_COREAUDIOKIT CoreAudioKit)
+    find_Library(OSX_AUDIOTOOLBOX AudioToolbox)
+    find_Library(OSX_AUDIOUNIT AudioUnit)
+    find_library(OSX_METAL Metal)
+    find_library(OSX_QUARTZCORE QuartzCore)
+    target_link_libraries(libultraship PRIVATE OpenEmuHelpers ${OSX_METAL} ${OSX_QUARTZCORE} ${OSX_FOUNDATION} ${OSX_AVFOUNDATION} ${OSX_COREFOUNDATION} ${OSX_AUDIOTOOLBOX} ${OSX_AUDIOUNIT} ${OSX_COREAUDIO} ${OSX_COREAUDIOKIT} ${CMAKE_DL_LIBS})
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
