@@ -26,6 +26,38 @@ JsonConfig::JsonConfig(std::string path) : mPath(path) {
     }
 }
 
+bool IsKeyArrayIndex(std::string key) {
+    return std::all_of(key.cbegin(), key.cend(), ::isdigit);
+}
+
+int32_t ConvertArrayIndexToInt(std::string key) {
+    try {
+        int32_t num = stoi(key, nullptr, 10);
+        return num >= 0 ? num : -1;
+    } catch (std::invalid_argument) {
+        return -1;
+    } catch (std::out_of_range) {
+        return -1;
+    }
+}
+
+json* AccessNestedValue(std::string key, json* currentJson) {
+    if (IsKeyArrayIndex(key)) {
+        return &(*currentJson)[ConvertArrayIndexToInt(key)];
+    } else {
+        return &(*currentJson)[key];
+    }
+}
+
+bool ArrayOrObjectContainsKey(std::string key, json* currentJson) {
+    if (currentJson->is_array() && IsKeyArrayIndex(key)) {
+        auto idx = ConvertArrayIndexToInt(key);
+        return currentJson->size() >= idx - 1 && !currentJson->at(idx).is_null();
+    } else {
+        return currentJson->contains(key);
+    }
+}
+
 void JsonConfig::SetArbitraryType(std::string key, json::value_type value) {
     auto keyParts = StringHelper::Split(key, ".");
 
@@ -33,13 +65,18 @@ void JsonConfig::SetArbitraryType(std::string key, json::value_type value) {
         // nested key
         json* currentJson = &mJson;
         for (size_t i = 0; i < keyParts.size() - 1; i++) {
-            if (!currentJson->contains(keyParts[i])) {
-                // create new object
-                (*currentJson)[keyParts[i]] = json::object();
+            if (!ArrayOrObjectContainsKey(keyParts[i], currentJson)) {
+                if (IsKeyArrayIndex(keyParts[i + 1])) {
+                    // create new array
+                    *AccessNestedValue(keyParts[i], currentJson) = json::array();
+                } else {
+                    // create new object
+                    *AccessNestedValue(keyParts[i], currentJson) = json::object();
+                }
             }
-            currentJson = &(*currentJson)[keyParts[i]];
+            currentJson = AccessNestedValue(keyParts[i], currentJson);
         }
-        (*currentJson)[keyParts[keyParts.size() - 1]] = value;
+        *AccessNestedValue(keyParts[keyParts.size() - 1], currentJson) = value;
     } else {
         // not nested
         mJson[key] = value;
@@ -52,15 +89,15 @@ json::value_type JsonConfig::GetArbitraryType(std::string key) {
     // find the deepest nested key if it exists
     json* currentJson = &mJson;
     for (size_t i = 0; i < keyParts.size() - 1; i++) {
-        if (!currentJson->contains(keyParts[i])) {
+        if (!ArrayOrObjectContainsKey(keyParts[i], currentJson)) {
             return nullptr;
         }
-        currentJson = &(*currentJson)[keyParts[i]];
+        currentJson = AccessNestedValue(keyParts[i], currentJson);
     }
 
     // extract the value if possible
-    if (currentJson->contains(keyParts[keyParts.size() - 1])) {
-        return (*currentJson)[keyParts[keyParts.size() - 1]];
+    if (ArrayOrObjectContainsKey(keyParts[keyParts.size() - 1], currentJson)) {
+        return *AccessNestedValue(keyParts[keyParts.size() - 1], currentJson);
     } else {
         return nullptr;
     }
@@ -72,6 +109,14 @@ bool JsonConfig::IsNewConfig() {
     return mIsNewConfig;
 }
 
+void EraseKeyInArrayOrObject(std::string key, json* currentJson) {
+    if (currentJson->is_array()) {
+        (*currentJson).erase(ConvertArrayIndexToInt(key));
+    } else {
+        (*currentJson).erase(key);
+    }
+}
+
 void JsonConfig::DeleteEntry(std::string key) {
     auto keyParts = StringHelper::Split(key, ".");
 
@@ -79,21 +124,21 @@ void JsonConfig::DeleteEntry(std::string key) {
     if (keyParts.size() > 1) {
         json* currentJson = &mJson;
         for (size_t i = 0; i < keyParts.size() - 1; i++) {
-            if (!currentJson->contains(keyParts[i])) {
+            if (!ArrayOrObjectContainsKey(keyParts[i], currentJson)) {
                 return;
             }
-            currentJson = &(*currentJson)[keyParts[i]];
+            currentJson = AccessNestedValue(keyParts[i], currentJson);
         }
-        (*currentJson).erase(keyParts[keyParts.size() - 1]);
+        EraseKeyInArrayOrObject(keyParts[keyParts.size() - 1], currentJson);
 
         // delete empty parents
         for (size_t i = keyParts.size() - 1; i > 0; i--) {
             if ((*currentJson).empty()) {
                 currentJson = &mJson;
                 for (size_t j = 0; j < i - 1; j++) {
-                    currentJson = &(*currentJson)[keyParts[j]];
+                    currentJson = AccessNestedValue(keyParts[j], currentJson);
                 }
-                (*currentJson).erase(keyParts[i - 1]);
+                EraseKeyInArrayOrObject(keyParts[i - 1], currentJson);
             }
         }
     } else {
