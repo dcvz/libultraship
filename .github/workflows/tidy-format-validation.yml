@@ -34,18 +34,18 @@ jobs:
       - name: Prepare compile_commands.json
         run: |
           cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      - name: Create results directory
-        run: |
-          mkdir clang-tidy-result
-      - name: Analyze
-        run: |
-          git diff -U0 HEAD^ -- 'src' 'include' ':!include/color.h' ':!include/libultra/*' ':!src/core/libultra/*' ':!src/graphic/Fast3D/*' | clang-tidy-diff -p1 -path build -export-fixes clang-tidy-result/fixes.yml
-      - name: Save PR metadata
-        run: |
-          echo ${{ github.event.number }} > clang-tidy-result/pr-id.txt
-          echo ${{ github.event.pull_request.head.repo.full_name }} > clang-tidy-result/pr-head-repo.txt
-          echo ${{ github.event.pull_request.head.ref }} > clang-tidy-result/pr-head-ref.txt
-      - uses: actions/upload-artifact@v2
+      - uses: ZedThree/clang-tidy-review@v0.10.0
         with:
-          name: clang-tidy-result
-          path: clang-tidy-result/
+          build_dir: build
+          include: 'src/*,include/*'
+          exclude: 'include/color.h,include/libultraship/libultra/*,src/core/libultra/*,src/graphic/Fast3D/*'
+          split_workflow: true
+          clang_tidy_version: 12
+          config_file: .clang-tidy
+      - uses: actions/upload-artifact@v3
+        with:
+          name: clang-tidy-review
+          path: |
+            clang-tidy-review-output.json
+            clang-tidy-review-metadata.json
+
